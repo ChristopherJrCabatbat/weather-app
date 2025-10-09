@@ -267,38 +267,34 @@ export default function Home() {
         🌤️ Weather App
       </motion.h1>
 
-      <form
-        onSubmit={(e) => e.preventDefault()}
-        className="w-full max-w-md flex flex-col gap-2 relative z-10"
-      >
-        <input
-          type="text"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          placeholder="Search city..."
-          className="p-3 rounded-xl bg-white text-gray-900 placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-        />
-      </form>
+      {/* Search Input and Suggestions Container */}
+      <div className="relative w-full max-w-md z-20">
+        <form onSubmit={(e) => e.preventDefault()}>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Search city..."
+            className="p-3 w-full rounded-xl bg-white text-gray-900 placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+          />
+        </form>
 
-      {/* City Suggestions */}
-      {suggestions.length > 0 && (
-        <ul
-          className="absolute left-1/2 transform -translate-x-1/2 mt-1 
-               w-full max-w-md bg-white text-gray-800 rounded-xl 
-               shadow-lg z-[9999] overflow-hidden"
-        >
-          {suggestions.map((s, index) => (
-            <li
-              key={index}
-              onClick={() => getWeatherByCoords(s.lat, s.lon)}
-              className="p-3 hover:bg-gray-200 cursor-pointer transition-colors"
-            >
-              {s.name}
-              {s.state ? `, ${s.state}` : ""} ({s.country})
-            </li>
-          ))}
-        </ul>
-      )}
+        {/* Suggestions directly below input */}
+        {suggestions.length > 0 && (
+          <ul className="absolute top-full left-0 w-full mt-2 bg-white text-gray-800 rounded-xl shadow-lg z-[9999] overflow-hidden">
+            {suggestions.map((s, index) => (
+              <li
+                key={index}
+                onClick={() => getWeatherByCoords(s.lat, s.lon)}
+                className="p-3 hover:bg-gray-200 cursor-pointer transition-colors"
+              >
+                {s.name}
+                {s.state ? `, ${s.state}` : ""} ({s.country})
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <button
         onClick={getUserLocation}
