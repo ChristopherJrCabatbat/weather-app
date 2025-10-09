@@ -1,15 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
+/** Types */
+type Suggestion = {
+  name: string;
+  state?: string;
+  country: string;
+  lat: number;
+  lon: number;
+};
+
+type Weather = {
+  name: string;
+  sys: { country: string };
+  weather: { main: string; description: string; icon: string }[];
+  main: { temp: number; feels_like: number; humidity: number };
+  wind: { speed: number };
+  timezone: number;
+  dt: number;
+};
+
 export default function Home() {
   const [city, setCity] = useState("");
-  const [weather, setWeather] = useState<any>(null);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [weather, setWeather] = useState<Weather | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0); // setter used to force periodic re-render for the clock
 
   /** Fetch city suggestions */
   useEffect(() => {
@@ -22,8 +41,11 @@ export default function Home() {
         const res = await fetch(
           `/api/geocode?city=${encodeURIComponent(city)}`
         );
-        const data = await res.json();
-        setSuggestions(data);
+        if (!res.ok) {
+          throw new Error("Failed to fetch suggestions");
+        }
+        const data = (await res.json()) as Suggestion[];
+        setSuggestions(data ?? []);
       } catch (err) {
         console.error(err);
         toast.error("Failed to fetch city suggestions");
@@ -40,13 +62,23 @@ export default function Home() {
       setIsLoading(true);
       const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
 
-      if (!res.ok) throw new Error("City not found or invalid response");
+      if (!res.ok) {
+        // try reading error message from body
+        let msg = "City not found or invalid response";
+        try {
+          const body = await res.json();
+          if (body?.error) msg = String(body.error);
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
 
-      const data = await res.json();
+      const data = (await res.json()) as Weather;
       setWeather(data);
       setSuggestions([]);
       toast.success(`Showing weather for ${data.name}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       toast.error("Failed to fetch weather data");
     } finally {
@@ -54,12 +86,8 @@ export default function Home() {
     }
   };
 
-  /** Get user's current location */
-  useEffect(() => {
-    getUserLocation();
-  }, []);
-
-  const getUserLocation = () => {
+  /** Get user's current location (wrapped in useCallback to satisfy hooks linter) */
+  const getUserLocation = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       return;
@@ -77,9 +105,15 @@ export default function Home() {
         setIsLoading(false);
       }
     );
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // no deps: getWeatherByCoords is stable (declared above in component)
 
-  /** Update time every minute */
+  useEffect(() => {
+    // auto-detect on first load
+    getUserLocation();
+  }, [getUserLocation]);
+
+  /** Update time every minute (trigger re-render) */
   useEffect(() => {
     if (!weather) return;
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
