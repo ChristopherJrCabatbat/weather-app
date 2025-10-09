@@ -9,8 +9,9 @@ export default function Home() {
   const [weather, setWeather] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [tick, setTick] = useState(0);
 
-  // Fetch city suggestions
+  /** Fetch city suggestions */
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (city.length < 3) {
@@ -18,7 +19,9 @@ export default function Home() {
         return;
       }
       try {
-        const res = await fetch(`/api/geocode?city=${city}`);
+        const res = await fetch(
+          `/api/geocode?city=${encodeURIComponent(city)}`
+        );
         const data = await res.json();
         setSuggestions(data);
       } catch (err) {
@@ -31,7 +34,7 @@ export default function Home() {
     return () => clearTimeout(delay);
   }, [city]);
 
-  // Fetch weather based on coordinates
+  /** Fetch weather by coordinates */
   const getWeatherByCoords = async (lat: number, lon: number) => {
     try {
       setIsLoading(true);
@@ -51,19 +54,222 @@ export default function Home() {
     }
   };
 
+  /** Get user's current location */
+  useEffect(() => {
+    getUserLocation();
+  }, []);
+
+  const getUserLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        await getWeatherByCoords(latitude, longitude);
+      },
+      (error) => {
+        console.error(error);
+        toast.error("Failed to get your location");
+        setIsLoading(false);
+      }
+    );
+  };
+
+  /** Update time every minute */
+  useEffect(() => {
+    if (!weather) return;
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [weather]);
+
+  /** Format local time */
+  const formatLocalTime = (tzSeconds: number) => {
+    const targetMs = Date.now() + tzSeconds * 1000;
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(targetMs));
+  };
+
+  /** Background color logic */
+  const getWeatherBackground = (main: string | undefined) => {
+    switch (main?.toLowerCase()) {
+      case "clear":
+        return "from-yellow-400 via-orange-500 to-pink-500"; // sunny
+      case "clouds":
+        return "from-gray-500 via-gray-600 to-gray-700"; // cloudy
+      case "rain":
+      case "drizzle":
+        return "from-blue-700 via-blue-800 to-gray-900"; // rainy
+      case "thunderstorm":
+        return "from-gray-800 via-gray-900 to-black"; // thunderstorm
+      case "snow":
+        return "from-blue-200 via-cyan-200 to-white"; // snowy
+      default:
+        return "from-indigo-600 via-blue-700 to-indigo-900"; // default
+    }
+  };
+
+  const currentBg = getWeatherBackground(weather?.weather?.[0]?.main);
+  const condition = weather?.weather?.[0]?.main?.toLowerCase();
+
+  /** Weather animation layers */
+  const WeatherAnimation = () => {
+    switch (condition) {
+      case "clear":
+        return (
+          <motion.div
+            className="absolute inset-0"
+            animate={{ opacity: [0.7, 1, 0.7] }}
+            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+            style={{
+              background:
+                "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.3) 0%, transparent 70%)",
+            }}
+          />
+        );
+
+      case "clouds":
+        return (
+          <motion.div
+            className="absolute inset-0 overflow-hidden"
+            initial={{ opacity: 0.5 }}
+            animate={{ opacity: 0.7 }}
+            transition={{ duration: 2 }}
+          >
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute bg-white/20 rounded-full blur-3xl"
+                style={{
+                  top: `${Math.random() * 80}%`,
+                  left: `${Math.random() * 100}%`,
+                  width: `${150 + Math.random() * 150}px`,
+                  height: `${80 + Math.random() * 80}px`,
+                }}
+                animate={{
+                  x: ["0%", "20%", "-10%", "0%"],
+                }}
+                transition={{
+                  duration: 30 + Math.random() * 20,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            ))}
+          </motion.div>
+        );
+
+      case "rain":
+      case "drizzle":
+        return (
+          <motion.div className="absolute inset-0 overflow-hidden">
+            {[...Array(40)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-0.5 h-6 bg-white/50 rounded-full"
+                style={{
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                }}
+                animate={{ y: ["-10%", "110%"] }}
+                transition={{
+                  duration: 1 + Math.random() * 0.5,
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: Math.random() * 1,
+                }}
+              />
+            ))}
+          </motion.div>
+        );
+
+      case "snow":
+        return (
+          <motion.div className="absolute inset-0 overflow-hidden">
+            {[...Array(30)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 bg-white rounded-full opacity-70"
+                style={{
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                }}
+                animate={{
+                  y: ["-5%", "105%"],
+                  x: ["0%", "10%", "-5%", "0%"],
+                }}
+                transition={{
+                  duration: 8 + Math.random() * 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: Math.random() * 3,
+                }}
+              />
+            ))}
+          </motion.div>
+        );
+
+      case "thunderstorm":
+        return (
+          <>
+            <motion.div
+              className="absolute inset-0"
+              animate={{ opacity: [0, 0.7, 0] }}
+              transition={{
+                repeat: Infinity,
+                duration: 3,
+                repeatDelay: 4,
+                ease: "easeInOut",
+              }}
+              style={{ background: "rgba(255,255,255,0.6)" }}
+            />
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-blue-700 to-indigo-900 text-white p-6 relative overflow-hidden">
+    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden text-white p-6">
+      {/* Animated Gradient */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentBg}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.2 }}
+          className={`absolute inset-0 bg-gradient-to-b ${currentBg} transition-all`}
+        />
+      </AnimatePresence>
+
+      {/* Animated Weather Layer */}
+      {weather && <WeatherAnimation />}
+
       <motion.h1
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-4xl font-bold mb-6 text-center"
+        className="text-4xl font-bold mb-6 text-center relative z-10 drop-shadow-lg"
       >
         🌤️ Weather App
       </motion.h1>
 
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="w-full max-w-md flex flex-col gap-2 relative"
+        className="w-full max-w-md flex flex-col gap-2 relative z-10"
       >
         <input
           type="text"
@@ -72,25 +278,36 @@ export default function Home() {
           placeholder="Search city..."
           className="p-3 rounded-xl bg-white text-gray-900 placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         />
-
-        {/* Suggestion Dropdown */}
-        {suggestions.length > 0 && (
-          <ul className="absolute top-16 left-0 w-full bg-white text-gray-800 rounded-xl shadow-lg z-20">
-            {suggestions.map((s, index) => (
-              <li
-                key={index}
-                onClick={() => getWeatherByCoords(s.lat, s.lon)}
-                className="p-3 hover:bg-gray-200 cursor-pointer rounded-lg"
-              >
-                {s.name}
-                {s.state ? `, ${s.state}` : ""} ({s.country})
-              </li>
-            ))}
-          </ul>
-        )}
       </form>
 
-      {/* Loading Spinner Overlay */}
+      {/* City Suggestions */}
+      {suggestions.length > 0 && (
+        <ul
+          className="absolute left-1/2 transform -translate-x-1/2 mt-1 
+               w-full max-w-md bg-white text-gray-800 rounded-xl 
+               shadow-lg z-[9999] overflow-hidden"
+        >
+          {suggestions.map((s, index) => (
+            <li
+              key={index}
+              onClick={() => getWeatherByCoords(s.lat, s.lon)}
+              className="p-3 hover:bg-gray-200 cursor-pointer transition-colors"
+            >
+              {s.name}
+              {s.state ? `, ${s.state}` : ""} ({s.country})
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <button
+        onClick={getUserLocation}
+        className="mt-4 bg-green-600 hover:bg-green-700 px-5 py-3 rounded-xl font-semibold transition-colors z-10"
+      >
+        📍 Use My Location
+      </button>
+
+      {/* Loading Spinner */}
       <AnimatePresence>
         {isLoading && (
           <motion.div
@@ -113,23 +330,48 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-white/10 backdrop-blur-lg p-6 rounded-2xl shadow-lg w-full max-w-md text-center"
+          className="mt-8 bg-white/10 backdrop-blur-lg p-6 rounded-2xl shadow-lg w-full max-w-md text-center relative z-10"
         >
-          <h2 className="text-2xl font-semibold mb-2">
+          <h2 className="text-2xl font-semibold mb-2 flex items-center justify-center gap-2">
             {weather.name}, {weather.sys.country}
+            <img
+              src={`https://flagcdn.com/24x18/${weather.sys.country.toLowerCase()}.png`}
+              alt={`${weather.sys.country} flag`}
+              className="w-6 h-4 rounded-sm shadow"
+            />
           </h2>
+
           <p className="text-lg capitalize">{weather.weather[0].description}</p>
+
           <img
             src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`}
             alt="Weather icon"
-            className="mx-auto"
+            className={`mx-auto ${
+              ["clouds", "rain", "thunderstorm"].includes(
+                weather.weather[0].main.toLowerCase()
+              )
+                ? "brightness-150"
+                : "brightness-100"
+            } drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]`}
           />
-          <p className="text-3xl font-bold">{Math.round(weather.main.temp)}°C</p>
+
+          <p className="text-3xl font-bold">
+            {Math.round(weather.main.temp)}°C
+          </p>
           <p className="text-sm mt-2">
             Feels like {Math.round(weather.main.feels_like)}°C
           </p>
           <p className="text-sm mt-1">Humidity: {weather.main.humidity}%</p>
           <p className="text-sm">Wind: {weather.wind.speed} m/s</p>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="mt-4 text-sm opacity-90"
+          >
+            🕒 Local Time: {formatLocalTime(weather.timezone)}
+          </motion.div>
         </motion.div>
       )}
     </main>
