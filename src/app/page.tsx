@@ -86,14 +86,14 @@ export default function Home() {
     }
   };
 
-  /** Get user's current location (wrapped in useCallback to satisfy hooks linter) */
-  const getUserLocation = useCallback(() => {
+  const getUserLocation = () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       return;
     }
 
     setIsLoading(true);
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -101,17 +101,24 @@ export default function Home() {
       },
       (error) => {
         console.error(error);
-        toast.error("Failed to get your location");
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error(
+            "Location access denied. Please allow it in your browser settings."
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          toast.error("Unable to retrieve your location. Try again later.");
+        } else {
+          toast.error("Failed to get your location.");
+        }
         setIsLoading(false);
       }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // no deps: getWeatherByCoords is stable (declared above in component)
+  };
 
-  useEffect(() => {
-    // auto-detect on first load
-    getUserLocation();
-  }, [getUserLocation]);
+  // useEffect(() => {
+  //   // auto-detect on first load
+  //   getUserLocation();
+  // }, [getUserLocation]);
 
   /** Update time every minute (trigger re-render) */
   useEffect(() => {
